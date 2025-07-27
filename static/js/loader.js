@@ -143,6 +143,12 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const page = parseInt(params.get('page')) || 1;
 
+        if (!append && page > 1) {
+            params.set('page', '1');
+            // Update the URL in the browser bar without reloading the page
+            history.replaceState({}, '', `?${params.toString()}`);
+        }
+
         if (!append) {
             resultsGrid.innerHTML = '';
             paginationContainer.innerHTML = '';
@@ -391,7 +397,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (item.tags && item.tags.length > 0) item.tags.slice(0, 3).forEach(tag => { tagsHTML += `<a href="#" class="tag-link" data-tag-id="${tag.id}" data-tag-name="${tag.name}" data-category="${category}">${tag.name}</a>`; });
             tagsHTML += '</div>';
             const titleText = item.title || 'Untitled', date = item.release_date || item.publication_date, titleWithDate = date ? `${titleText} (${date})` : titleText;
-            let metaHTML = (category === 'Book' && item.author) ? `<span class="rec-card-genre">by ${item.author}</span>` : (category === 'Movie' && item.genre) ? `<span class="rec-card-genre">${item.genre}</span>` : '';
+            let metaHTML = '';
+            if (item.author) {
+                metaHTML = `<span class="rec-card-genre">by ${item.author}</span>`;
+            } else if (item.genre) {
+                metaHTML = `<span class="rec-card-genre">${item.genre}</span>`;
+            }
             card.innerHTML = `<img src="${item.image.url || 'https://via.placeholder.com/400x225.png?text=No+Image'}" alt="Cover for ${titleText}" class="rec-card-img"><div class="rec-card-content"><h3 class="rec-card-title">${titleWithDate}</h3>${metaHTML}<p class="rec-card-description">${(item.description || '').substring(0, 100)}...</p><p class="rec-card-context"><strong>Why we chose it:</strong> ${(item.context || '').substring(0, 80)}...</p>${tagsHTML}<button class="view-more-btn">View More →</button></div>`;
             card.querySelector('.view-more-btn').addEventListener('click', () => openModal(item, category));
             return card;
