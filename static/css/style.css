@@ -197,8 +197,15 @@ header p { font-size: 1.1rem; color: #6c757d; }
 .form-group { margin-bottom: 1.5rem; }
 /* ... (The rest of your CSS for cards, modals, etc. remains the same) ... */
 .form-group label { display: block; font-weight: 600; margin-bottom: 0.5rem; }
-textarea { width: 100%; padding: 0.75rem; font-family: var(--font-family); font-size: 1rem; border: 1px solid var(--gray); border-radius: 8px; resize: vertical; transition: border-color 0.2s, box-shadow 0.2s; }
+textarea { width: 100%; padding: 0.75rem; font-family: var(--font-family); font-size: 1rem; border: 1px solid var(--gray); border-radius: 8px; resize: none; transition: border-color 0.2s, box-shadow 0.2s; }
 textarea:focus { outline: none; border-color: var(--primary-green); box-shadow: 0 0 0 3px #28a74533; }
+/* --- Style for input hint text --- */
+.input-hint {
+    display: block;
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    color: #6c757d; /* Muted gray color */
+}
 .category-buttons-container { display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: center; }
 .category-btn { background-color: var(--white); color: var(--text-color); border: 1px solid var(--gray); padding: 0.5rem 1rem; border-radius: 20px; cursor: pointer; font-weight: 600; transition: all 0.2s ease-in-out; }
 .category-btn:hover { background-color: var(--light-gray); }

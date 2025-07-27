@@ -10,34 +10,35 @@ def get_all_categories():
     {
         "name": "Movies",
         "value": "Movies",
-        "label": "Tell us what kind of movie recommendations you are looking for",
-        "placeholder": "e.g., 'I just saw Romeo and Juliet, can you recommmend more movies like this..'",
+        "label": "What kind of movies are you looking for? The more specific your context, the better the picks.",
+        "placeholder": "e.g., 'I just saw Romeo and Juliet. I love tragic romance—can you recommend more movies like this?'",
     },
     {
         "name": "Books",
         "value": "Books",
-        "label": "Tell us what kind of book recommendations you are looking for",
-        "placeholder": "e.g., 'I just read The Great Gatsby, can you recommmend more books like this..'",
+        "label": "What kind of books are you into? Mentioning what you've read or liked helps us recommend better.",
+        "placeholder": "e.g., 'I just finished The Great Gatsby. I enjoy classic literature with complex characters—any suggestions?'",
     },
     {
         "name": "Places",
         "value": "Places",
-        "label": "Tell us what kind of place recommendations you are looking for",
-        "placeholder": "e.g., 'I am looking for good restaurants in New York, can you recommmend some places..'",
+        "label": "Looking for a place? The more details you provide (location, mood, purpose), the better the suggestions.",
+        "placeholder": "e.g., 'I'm visiting New York and craving a cozy Italian spot—any restaurant recommendations?'",
     },
     {
         "name": "TV Shows",
         "value": "TV Shows",
-        "label": "Tell us what kind of TV show recommendations you are looking for",
-        "placeholder": "e.g., 'I just saw Breaking Bad, can you recommmend more shows like this..'",
+        "label": "What kind of shows do you want to watch? Sharing what you've liked helps tailor the recommendations.",
+        "placeholder": "e.g., 'I just finished Breaking Bad. I enjoy intense dramas with strong characters—any similar shows?'",
     },
+    ]
     # {
     #     "name": "Destinations",
     #     "value": "Destinations",
     #     "label": "Tell us what kind of travel destination recommendations you are looking for",
     #     "placeholder": "e.g., 'I am planning a trip to Europe, can you recommmend some destinations..'",
     # },
-    ]
+    
     return {
         'categories_data': CATEGORIES_DATA,
         'status_code': 200
