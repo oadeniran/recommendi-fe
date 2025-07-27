@@ -71,6 +71,8 @@ def update_session():
     # For now, we just log it
     print(f"Updating session with ID: {session_id} and data: {data}")
 
+    return jsonify({'status': 'success', 'session_id': session_id})
+
 
 @app.route('/api/recommendations')
 def api_recommendations():
