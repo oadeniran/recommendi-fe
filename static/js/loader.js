@@ -35,6 +35,18 @@ document.addEventListener('DOMContentLoaded', () => {
             history.unshift(session);
             if (history.length > 20) history.pop();
             saveSessionHistory(history);
+
+            // Future extension: Send this history to the backend if needed
+            // This is "fire-and-forget". We send the request but don't wait for it.
+            // The UI continues to work instantly.
+            fetch('/api/update_session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(session)
+            }).catch(error => {
+                // Log any network error silently in the console, as it's a background task.
+                console.error('Background sync failed:', error);
+            });
         }
     };
     
@@ -276,9 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
         history.pushState({}, '', '/');
         renderSessionHistory();
     });
-    // closeModalBtn.addEventListener('click', () => modalOverlay.classList.remove('active'));
-    // modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) modalOverlay.classList.remove('active'); });
-
+    
     // --- SETUP & UI HELPERS ---
     const setupCategoryButtons = async (isReset = false) => {
         const container = document.querySelector('.category-buttons-container');

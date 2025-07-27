@@ -49,6 +49,7 @@ def api_categories():
         return jsonify({'error': str(e)}), 500
     return jsonify(categories)
 
+# Future extension capability for session management
 @app.route('/api/create_session', methods=['POST'])
 def create_session():
     """Generates a unique session ID and stores it."""
@@ -57,6 +58,21 @@ def create_session():
     print(f"Creating session with ID: {session_id} and data: {data}")
     print(f"New session created: {session_id}") 
     return jsonify({'session_id': session_id})
+
+@app.route('/api/update_session', methods=['POST'])
+def update_session():
+    """Updates a session in the cache with the full session details."""
+    data = request.json
+    session_id = data.get('session_id')
+    
+    # Basic validation
+    if not session_id:
+        return jsonify({'error': 'Session ID is required'}), 400
+
+    # The session data can then be used extensively in the app
+    # For now, we just log it
+    print(f"Updating session with ID: {session_id} and data: {data}")
+
 
 @app.route('/api/recommendations')
 def api_recommendations():
