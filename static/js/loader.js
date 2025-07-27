@@ -1,36 +1,155 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // --- DOM Element References ---
     const form = document.getElementById('recommendation-form');
+    const messageLabel = form.querySelector('label[for="user_message"]');
+    const messageTextarea = document.getElementById('user_message');
     const resultsGrid = document.getElementById('recommendations-grid');
     const paginationContainer = document.getElementById('pagination-container');
-    const categoryButtons = document.querySelectorAll('.category-btn');
     const hiddenCategoryInput = document.getElementById('selected-category');
+    // Sidebar elements
+    const newSessionBtn = document.getElementById('new-session-btn');
+    const backBtn = document.getElementById('sidebar-back-btn');
+    const sessionList = document.getElementById('session-history-list');
+    const clearHistoryBtn = document.getElementById('clear-history-btn');
+    // Modal elements
+    const modalOverlay = document.getElementById('modal-overlay');
+    const modalBody = document.getElementById('modal-body');
+    const closeModalBtn = document.getElementById('modal-close');
 
+    // --- State & Config ---
     let isLoading = false;
+    const messageHistory = {};
+    const labelMessages = {};
+    const placeholderMessages = {};
 
-    // --- Core Function: Fetch data based on URL ---
+    // --- SESSION HISTORY MANAGEMENT ---
+    const getSessionHistory = () => JSON.parse(localStorage.getItem('recommendi_sessions')) || [];
+    
+    const saveSessionHistory = (history) => {
+        localStorage.setItem('recommendi_sessions', JSON.stringify(history));
+    };
+
+    const addToHistory = (session) => {
+        let history = getSessionHistory();
+        if (!history.some(s => s.full_message === session.full_message)) {
+            history.unshift(session);
+            if (history.length > 20) history.pop();
+            saveSessionHistory(history);
+        }
+    };
+    
+    const renderSessionHistory = () => {
+        const history = getSessionHistory();
+        sessionList.innerHTML = '';
+        const currentPath = window.location.search;
+        history.forEach(session => {
+            const li = document.createElement('li');
+            const a = document.createElement('a');
+            a.href = session.url;
+            a.textContent = session.clipped_message;
+            a.title = session.full_message;
+            if (session.url === currentPath) {
+                a.classList.add('active');
+            }
+            a.addEventListener('click', (e) => {
+                e.preventDefault();
+                window.history.pushState({}, '', session.url);
+                // fetchAndRender();
+                // renderSessionHistory(); 
+                handleStateChange(); // Use the new state change handler
+            });
+            li.appendChild(a);
+            sessionList.appendChild(li);
+        });
+    };
+
+    const updateSearchContextUI = (context, prefixText = '') => {
+    const container = document.getElementById('search-context-display');
+    if (context && context.type === 'tag') {
+        // Create the prefix with a space only if the text exists
+        const prefix = prefixText ? prefixText + ' ' : '';
+        
+        container.innerHTML = `
+            <div class="search-context-wrapper">
+                <span>${prefix}Results for tag:</span>
+                <span class="tag-pill">${context.name}</span>
+            </div>
+        `;
+    } 
+    else if (context && context.type === 'loading') {
+        container.innerHTML = `<div class="search-context-wrapper"><span>Loading recommendations...</span></div>`;
+    }
+    else {
+        container.innerHTML = '';
+    }
+    };
+
+    const handleStateChange = () => {
+        const params = new URLSearchParams(window.location.search);
+        
+        // Update the form to match the URL state
+        if (params.get('search_type') === 'message') {
+             messageTextarea.value = params.get('query') || '';
+        } else {
+             messageTextarea.value = '';
+        }
+
+        const category = params.get('category') || 'Movie';
+        hiddenCategoryInput.value = category;
+        
+        document.querySelectorAll('.category-buttons-container .category-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.value === category);
+        });
+
+        messageLabel.textContent = labelMessages[category] || "What's on your mind?";
+        messageTextarea.placeholder = placeholderMessages[category] || "Tell me what you're looking for...";
+
+        // Fetch the data and update the session list's active state
+        fetchAndRender();
+        renderSessionHistory();
+    };
+    
+    // --- CORE DATA FETCHING ---
     const fetchAndRender = async (append = false) => {
         if (isLoading) return;
         isLoading = true;
 
         const params = new URLSearchParams(window.location.search);
+        if (!params.has('search_type')) {
+            isLoading = false;
+            return;
+        }
+        
         const page = parseInt(params.get('page')) || 1;
 
-        if (page === 1 && !append) {
-            resultsGrid.innerHTML = ''; // Clear grid for new search
+        if (!append) {
+            resultsGrid.innerHTML = '';
+            paginationContainer.innerHTML = '';
             showSkeletons();
+            updateSearchContextUI({ type: 'loading' }); // Show loading state in search context
         } else {
             const btn = document.getElementById('load-more-btn');
-            if (btn) btn.textContent = 'Loading...';
+            if (btn) {
+                btn.textContent = 'Loading...';
+                btn.disabled = true;
+            }
         }
 
         try {
-            await new Promise(res => setTimeout(res, 500)); // Simulate network delay
             const response = await fetch(`/api/recommendations?${params.toString()}`);
             if (!response.ok) throw new Error('API response failed');
             const data = await response.json();
 
-            if (page === 1 && !append) hideSkeletons();
+            updateSearchContextUI(data.search_context); // Update search context UI
 
+            if (!append) hideSkeletons();
+            
+            if (data.recommendations.length === 0 && !append) {
+                const message = data.error_message || "We couldn't find any recommendations. Please try a different search.";
+                resultsGrid.innerHTML = `<p class="error-message">${message}</p>`;
+                return;
+            }
+            
             data.recommendations.forEach(item => {
                 const category = params.get('category') || 'Movie';
                 resultsGrid.append(createCard(item, category));
@@ -45,103 +164,183 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // --- Event Handlers ---
-    // 1. On Form Submit (Message Search)
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const formData = new FormData(form);
-        const params = new URLSearchParams();
-        params.set('search_type', 'message');
-        params.set('query', formData.get('user_message'));
-        params.set('category', formData.get('category'));
-        params.set('page', '1');
-        
-        // Update URL and fetch
-        history.pushState({}, '', `?${params.toString()}`);
-        fetchAndRender();
+        const message = formData.get('user_message');
+        if (!message.trim() || isLoading) return;
+
+        //isLoading = true; // Set loading state
+
+        try {
+            // 1. NEW: Create the session on the backend first
+            const sessionResponse = await fetch('/api/create_session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: message })
+            });
+            if (!sessionResponse.ok) throw new Error('Failed to create session');
+            const sessionData = await sessionResponse.json();
+            const sessionId = sessionData.session_id;
+
+            // 2. Build the URL with the new session ID
+            const params = new URLSearchParams();
+            params.set('search_type', 'message');
+            params.set('query', message);
+            params.set('category', formData.get('category'));
+            params.set('page', '1');
+            params.set('session_id', sessionId); // Add the session ID
+            
+            const newUrl = `?${params.toString()}`;
+            history.pushState({}, '', newUrl);
+
+            // 3. Add to localStorage history (including the session ID)
+            addToHistory({
+                id: Date.now(),
+                session_id: sessionId, // Store the ID
+                full_message: message,
+                clipped_message: message.length > 25 ? message.substring(0, 25) + '...' : message,
+                url: newUrl
+            });
+            
+            renderSessionHistory();
+            fetchAndRender();
+
+        } catch (error) {
+            console.error("Error creating session:", error);
+        }
     });
 
-    // 2. On Tag Click (Tag Search) - uses event delegation
-    resultsGrid.addEventListener('click', (e) => {
+    document.addEventListener('click', (e) => {
         const tagLink = e.target.closest('.tag-link');
+        const loadMoreBtn = e.target.closest('#load-more-btn');
+
         if (tagLink) {
             e.preventDefault();
+            closeModal();
+
+            //ensure button is set to the current category
+            const currentCategory = hiddenCategoryInput.value;
+            if (tagLink.dataset.category !== currentCategory) {
+                hiddenCategoryInput.value = tagLink.dataset.category;
+                document.querySelectorAll('.category-buttons-container .category-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.value === tagLink.dataset.category); 
+                });
+                messageLabel.textContent = labelMessages[tagLink.dataset.category] || "What's on your mind?";
+                messageTextarea.placeholder = placeholderMessages[tagLink.dataset.category] || "Tell me what you're looking for...";
+            }
+
+            // Update tag context display to loading state
+            updateSearchContextUI({
+                type: 'tag',
+                name: tagLink.dataset.tagName
+            }, 'Loading');
+
             const params = new URLSearchParams();
             params.set('search_type', 'tag');
             params.set('query', tagLink.dataset.tagId);
             params.set('category', tagLink.dataset.category);
+            params.set('tag_name', tagLink.dataset.tagName);
             params.set('page', '1');
-
-            // Update URL and fetch
             history.pushState({}, '', `?${params.toString()}`);
             fetchAndRender();
+            renderSessionHistory();
         }
-    });
 
-    // 3. On "Load More" Click
-    paginationContainer.addEventListener('click', (e) => {
-        if (e.target.id === 'load-more-btn') {
+        if (loadMoreBtn && !isLoading) {
             const params = new URLSearchParams(window.location.search);
             const currentPage = parseInt(params.get('page')) || 1;
             params.set('page', currentPage + 1);
-
-            // Update URL and fetch (appending results)
             history.pushState({}, '', `?${params.toString()}`);
-            fetchAndRender(true); // `true` to append
+            fetchAndRender(true);
         }
     });
     
-    // 4. On Browser Back/Forward
-    window.addEventListener('popstate', () => {
-        fetchAndRender();
+    window.addEventListener('popstate', handleStateChange);
+
+    clearHistoryBtn.addEventListener('click', () => {
+        // Optional but recommended: Confirm before deleting
+        if (confirm('Are you sure you want to clear all session history? This cannot be undone.')) {
+            localStorage.removeItem('recommendi_sessions');
+            renderSessionHistory(); // Re-render the list, which will now be empty
+        }
     });
 
-    // 5. Initial page load check
-    if (window.location.search) {
-        // If URL has params, populate the form and fetch results
-        const params = new URLSearchParams(window.location.search);
-        form.querySelector('#user_message').value = params.get('query') || '';
-        const category = params.get('category') || 'Movie';
-        hiddenCategoryInput.value = category;
-        categoryButtons.forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.value === category);
-        });
-        fetchAndRender();
-    }
+    backBtn.addEventListener('click', () => history.back());
+    newSessionBtn.addEventListener('click', () => {
+        resultsGrid.innerHTML = '';
+        paginationContainer.innerHTML = '';
+        form.reset();
+        // Reset category button and text to default
+        setupCategoryButtons(true);
+        history.pushState({}, '', '/');
+        renderSessionHistory();
+    });
+    // closeModalBtn.addEventListener('click', () => modalOverlay.classList.remove('active'));
+    // modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) modalOverlay.classList.remove('active'); });
 
-    // --- UI Helper Functions ---
-    const showSkeletons = () => {
-        const skeletonTemplate = document.getElementById('skeleton-card-template');
-        for (let i = 0; i < 4; i++) resultsGrid.append(skeletonTemplate.content.cloneNode(true));
-    };
+    // --- SETUP & UI HELPERS ---
+    const setupCategoryButtons = async (isReset = false) => {
+        const container = document.querySelector('.category-buttons-container');
+        if(isReset) container.innerHTML = '';
 
-    const hideSkeletons = () => {
-        resultsGrid.querySelectorAll('.skeleton-card').forEach(s => s.remove());
-    };
+        try {
+            const response = await fetch('/api/categories');
+            const categories = await response.json();
+            categories.forEach((cat, index) => {
+                labelMessages[cat.value] = cat.label;
+                placeholderMessages[cat.value] = cat.placeholder;
 
-    const createCard = (item, category) => {
-        const card = document.createElement('div');
-        card.className = 'rec-card';
-        card.dataset.itemData = JSON.stringify(item);
-        
-        // Tags need to know their category for the next search
-        let tagsHTML = '<div class="rec-card-tags">';
-        if (item.tags && item.tags.length > 0) {
-            item.tags.slice(0, 3).forEach(tag => {
-                tagsHTML += `<a href="#" class="tag-link" data-tag-id="${tag.id}" data-category="${category}">${tag.name}</a>`;
+                if(isReset || container.children.length < categories.length) {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'category-btn';
+                    button.dataset.value = cat.value;
+                    button.textContent = cat.name;
+                    if (index === 0) {
+                        button.classList.add('active');
+                        hiddenCategoryInput.value = cat.value;
+                        messageLabel.textContent = cat.label;
+                        messageTextarea.placeholder = cat.placeholder;
+                    }
+                    button.addEventListener('click', function() {
+                        const newCategoryValue = this.dataset.value;
+                        const previousCategoryValue = hiddenCategoryInput.value;
+                        if (newCategoryValue === previousCategoryValue) return;
+                        messageHistory[previousCategoryValue] = messageTextarea.value;
+                        container.querySelectorAll('.category-btn').forEach(btn => btn.classList.remove('active'));
+                        this.classList.add('active');
+                        hiddenCategoryInput.value = newCategoryValue;
+                        messageLabel.textContent = labelMessages[newCategoryValue];
+                        messageTextarea.placeholder = placeholderMessages[newCategoryValue];
+                        messageTextarea.value = messageHistory[newCategoryValue] || '';
+                    });
+                    container.appendChild(button);
+                }
             });
+        } catch (error) {
+            console.error('Failed to load categories:', error);
+            container.innerHTML = '<p class="error-message">Could not load categories.</p>';
         }
-        tagsHTML += '</div>';
-
-        // ... rest of card creation is the same ...
-        const titleText = item.title || 'Untitled', date = item.release_date || item.publication_date, titleWithDate = date ? `${titleText} (${date})` : titleText;
-        let metaHTML = (category === 'Book' && item.author) ? `<span class="rec-card-genre">by ${item.author}</span>` : (category === 'Movie' && item.genre) ? `<span class="rec-card-genre">${item.genre}</span>` : '';
-        card.innerHTML = `<img src="${item.image || 'https://via.placeholder.com/400x225.png?text=No+Image'}" alt="Cover for ${titleText}" class="rec-card-img"><div class="rec-card-content"><h3 class="rec-card-title">${titleWithDate}</h3>${metaHTML}<p class="rec-card-description">${(item.description || '').substring(0, 100)}...</p><p class="rec-card-context"><strong>Why we chose it:</strong> ${(item.context || '').substring(0, 80)}...</p>${tagsHTML}<button class="view-more-btn">View More →</button></div>`;
-        card.querySelector('.view-more-btn').addEventListener('click', () => openModal(item, category));
-        return card;
     };
 
+    const showSkeletons = () => { const resultsGrid = document.getElementById('recommendations-grid'); const skeletonTemplate = document.getElementById('skeleton-card-template'); for (let i = 0; i < 4; i++) resultsGrid.append(skeletonTemplate.content.cloneNode(true)); };
+    const hideSkeletons = () => { document.querySelectorAll('.skeleton-card').forEach(s => s.remove()); };
+    const createCard = (item, category) => { 
+        const card = document.createElement('div');
+            card.className = 'rec-card';
+            card.dataset.itemData = JSON.stringify(item);
+            let tagsHTML = '<div class="rec-card-tags">';
+            if (item.tags && item.tags.length > 0) item.tags.slice(0, 3).forEach(tag => { tagsHTML += `<a href="#" class="tag-link" data-tag-id="${tag.id}" data-tag-name="${tag.name}" data-category="${category}">${tag.name}</a>`; });
+            tagsHTML += '</div>';
+            const titleText = item.title || 'Untitled', date = item.release_date || item.publication_date, titleWithDate = date ? `${titleText} (${date})` : titleText;
+            let metaHTML = (category === 'Book' && item.author) ? `<span class="rec-card-genre">by ${item.author}</span>` : (category === 'Movie' && item.genre) ? `<span class="rec-card-genre">${item.genre}</span>` : '';
+            card.innerHTML = `<img src="${item.image.url || 'https://via.placeholder.com/400x225.png?text=No+Image'}" alt="Cover for ${titleText}" class="rec-card-img"><div class="rec-card-content"><h3 class="rec-card-title">${titleWithDate}</h3>${metaHTML}<p class="rec-card-description">${(item.description || '').substring(0, 100)}...</p><p class="rec-card-context"><strong>Why we chose it:</strong> ${(item.context || '').substring(0, 80)}...</p>${tagsHTML}<button class="view-more-btn">View More →</button></div>`;
+            card.querySelector('.view-more-btn').addEventListener('click', () => openModal(item, category));
+            return card;
+        };
     const updatePagination = (hasNext) => {
+        const paginationContainer = document.getElementById('pagination-container');
         paginationContainer.innerHTML = '';
         if (hasNext) {
             const loadMoreBtn = document.createElement('button');
@@ -152,20 +351,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     
-    const modalOverlay = document.getElementById('modal-overlay'), modalBody = document.getElementById('modal-body'), closeModalBtn = document.getElementById('modal-close');
-
-    const openModal = (item, category) => {
+    const openModal = (item, category) => { 
+        const modalOverlay = document.getElementById('modal-overlay'), modalBody = document.getElementById('modal-body');
         let tagsHTML = '<div class="modal-tags">';
-        if (item.tags && item.tags.length > 0) item.tags.forEach(tag => { tagsHTML += `<a href="/tag/${tag.id}" class="tag-link">${tag.name}</a>`; });
+        if (item.tags && item.tags.length > 0) item.tags.forEach(tag => { tagsHTML += `<a href="#" class="tag-link" data-tag-id="${tag.id}" data-tag-name="${tag.name}" data-category="${category}">${tag.name}</a>`; });
         tagsHTML += '</div>';
-        
-        // **FIXED**: Simplified extra data handling
-        const extraDataHTML = `
-            <div class="extra-data-container">
-                <h3>Extra Data</h3>
-                <pre class="extra-data-pre">${item.extra_data || 'No extra data available.'}</pre>
-            </div>`;
+        let extraDataHTML = '';
+        const extraData = item.extra_data_string || 'No extra data available.';
+        const clipLength = 200; // Set the character limit
 
+        if (extraData.length > clipLength) {
+            // If data is long, create clipped version with a toggle button
+            const clippedData = extraData.substring(0, clipLength) + '...';
+            extraDataHTML = `
+                <div class="extra-data-container">
+                    <h3>Extra Data</h3>
+                    <pre class="extra-data-pre" id="extra-data-content">${clippedData}</pre>
+                    <button class="toggle-extra-data" id="toggle-extra-btn" data-state="clipped">Show More</button>
+                </div>`;
+        } else {
+            // If data is short, display as normal
+            extraDataHTML = `
+                <div class="extra-data-container">
+                    <h3>Extra Data</h3>
+                    <pre class="extra-data-pre">${extraData}</pre>
+                </div>`;
+        }
         let footerMeta = (category === 'Book' && item.author) ? `by ${item.author}` : (category === 'Movie' && item.genre) ? `Genre: ${item.genre}` : '';
         let actionBtnHTML = '';
         if (item.action) {
@@ -177,11 +388,57 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         const footerHTML = `<div class="modal-footer"><div class="footer-meta">${footerMeta}</div><div class="footer-actions"><button class="btn-reaction">👍</button><button class="btn-reaction">👎</button>${actionBtnHTML}</div></div>`;
-
-        modalBody.innerHTML = `<img src="${item.image || 'https://via.placeholder.com/400x600.png?text=No+Image'}" alt="Cover for ${item.title}" class="modal-img"><div class="modal-text-content"><h2>${item.title}</h2><h3>Description</h3><p>${item.description || 'No description available.'}</p><h3>Context</h3><p>${item.context || 'No context available.'}</p><h3>Tags</h3>${tagsHTML}${extraDataHTML}${footerHTML}</div>`;
+        modalBody.innerHTML = `
+            <img src="${item.image.url || 'https://via.placeholder.com/600x338.png?text=No+Image'}" alt="Cover for ${item.title}" class="modal-img-top">
+            <div class="modal-text-content">
+                <h2>${item.title}</h2>
+                <h3>Description</h3>
+                <p>${item.description || 'No description available.'}</p>
+                <h3>Context</h3>
+                <p>${item.context || 'No context available.'}</p>
+                <h3>Tags</h3>
+                ${tagsHTML}
+                ${extraDataHTML}
+                ${footerHTML}
+            </div>
+        `;
         modalOverlay.classList.add('active');
+
+        const toggleBtn = document.getElementById('toggle-extra-btn');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', function() {
+                const content = document.getElementById('extra-data-content');
+                if (this.dataset.state === 'clipped') {
+                    content.textContent = extraData; // Show full text
+                    this.textContent = 'Show Less';
+                    this.dataset.state = 'expanded';
+                } else {
+                    content.textContent = extraData.substring(0, clipLength) + '...'; // Show clipped text
+                    this.textContent = 'Show More';
+                    this.dataset.state = 'clipped';
+                }
+            });
+        }
     };
 
-    closeModalBtn.addEventListener('click', () => modalOverlay.classList.remove('active'));
-    modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) modalOverlay.classList.remove('active'); });
+    const closeModal = () => {
+        modalOverlay.classList.remove('active');
+    };
+
+    closeModalBtn.addEventListener('click', closeModal);
+    modalOverlay.addEventListener('click', (e) => { 
+        if (e.target === modalOverlay) closeModal(); 
+    });
+
+    // --- App Initialization ---
+    const initialize = () => {
+        // First, create the category buttons so they are ready.
+        setupCategoryButtons(); 
+
+        // Then, handle the initial state from the URL.
+        // This single function will render the session history AND fetch results if needed.
+        handleStateChange();    
+    };
+
+    initialize();
 });

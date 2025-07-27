@@ -1,85 +1,10 @@
 import re
 import json
 from flask import Flask, render_template, request, jsonify
+import api_calls
+import uuid
 
 app = Flask(__name__)
-PER_PAGE = 3 # How many results to fetch at a time
-
-# --- Helper Functions & Data Transformation ---
-
-def clean_html_text(raw_html):
-    if not isinstance(raw_html, str): return raw_html
-    return re.sub(re.compile('<.*?>'), '', raw_html)
-
-def format_extra_data_as_string(data_dict):
-    print(f"Formatting extra data: {data_dict}")
-    """
-    NEW: Converts the extra_data dictionary into a formatted, multi-line string.
-    """
-    output_lines = []
-    for key, value in data_dict.items():
-        if not value: continue
-        
-        formatted_key = key.replace('_', ' ').title()
-        
-        if isinstance(value, dict):
-            output_lines.append(f"{formatted_key}:")
-            for sub_key, sub_value in value.items():
-                output_lines.append(f"  {sub_key.replace('_', ' ').title()}: {sub_value}")
-        elif isinstance(value, list):
-            output_lines.append(f"{formatted_key}:")
-            for item in value:
-                output_lines.append(f"  - {item}")
-        else:
-            output_lines.append(f"{formatted_key}: {value}")
-            
-    return "\n".join(output_lines)
-
-def transform_movie_entity(entity):
-    extra_data_dict = {
-        'duration': entity.get('properties', {}).get('duration'),
-        'content_rating': entity.get('properties', {}).get('content_rating'),
-        'popularity': entity.get('popularity'),
-    }
-    # Add external sources like imdb, where_to_watch
-    for source, data in entity.get('external', {}).items():
-        extra_data_dict[source] = data[0] if source != 'where_to_watch' else data
-        
-    return {
-        'id': entity.get('id'), 'title': entity.get('name'),
-        'release_date': entity.get('properties', {}).get('release_date', '')[:4],
-        'description': clean_html_text(entity.get('properties', {}).get('description')),
-        'genre': next((tag['name'] for tag in entity.get('tags', []) if tag['type'] == 'genre'), None),
-        'image': entity.get('properties', {}).get('image'), 'tags': entity.get('tags', []),
-        'extra_data': format_extra_data_as_string(extra_data_dict), # Use the new string formatter
-        'action': entity.get('action')
-    }
-
-def transform_book_entity(entity):
-    def clean_author(author_str: str) -> str:
-        match = re.match(r"^\d{4},\s*(.*)", author_str); return match.group(1) if match else author_str
-    
-    extra_data_dict = {
-        'publisher': entity.get('properties', {}).get('publisher'),
-        'page_count': entity.get('properties', {}).get('page_count'),
-        'popularity': entity.get('popularity'),
-        'goodreads': entity.get('external', {}).get('goodreads', [{}])[0]
-    }
-
-    return {
-        'id': entity.get('id'), 'title': entity.get('name'), 'author': clean_author(entity.get('disambiguation', '')),
-        'publication_date': entity.get('properties', {}).get('publication_date', '')[:4],
-        'description': clean_html_text(entity.get('properties', {}).get('description')),
-        'genre': next((tag['name'] for tag in entity.get('tags', []) if tag['type'] == 'genre'), None),
-        'image': entity.get('properties', {}).get('image'), 'tags': entity.get('tags', []),
-        'extra_data': format_extra_data_as_string(extra_data_dict), # Use the new string formatter
-        'action': entity.get('action')
-    }
-
-# --- Mock Data and Recommendation Logic ---
-
-from MOCK_DATA import MOCK_MOVIES, MOCK_BOOKS
-CATEGORY_MAP = {'Movie': {'data': MOCK_MOVIES, 'transform': transform_movie_entity}, 'Book': {'data': MOCK_BOOKS, 'transform': transform_book_entity}}
 
 
 def get_data_from_db(search_params):
@@ -89,31 +14,21 @@ def get_data_from_db(search_params):
     category = search_params.get('category', 'Movie')
     page = int(search_params.get('page', 1))
     search_type = search_params.get('search_type', 'message')
+    session_id = "string" #search_params.get('session_id', None)
+    query_value = search_params.get('query')
+    tag_name = search_params.get('tag_name', 'Unknown Tag')
 
-    if category not in CATEGORY_MAP: return [], False
+    search_context = {'type': search_type, 'query': query_value, 'name': tag_name}
     
-    source_data = CATEGORY_MAP[category]['data']
+    try:
+        recommendations_obj = api_calls.get_recommendation_data(session_id, category, query_value=query_value, search_type=search_type, page=page).get("recommendations", {})
+        recommendations = recommendations_obj.get('recommendations', [])
+        has_next = recommendations_obj.get('has_next_page', False)
+    except Exception as e:
+        print(f"Error generating recommendations for query{query_value} in category {category}: {e}")
+        return [], False
     
-    # Filter data based on search type
-    if search_type == 'tag':
-        tag_id = search_params.get('query')
-        filtered_data = [item for item in source_data if any(tag['id'] == tag_id for tag in item.get('tags', []))]
-    else: # Default to 'message' search (we don't filter by message text in this mock)
-        filtered_data = source_data
-
-    # Paginate the filtered data
-    start_index = (page - 1) * PER_PAGE
-    end_index = start_index + PER_PAGE
-    paginated_data = filtered_data[start_index:end_index]
-    has_next = end_index < len(filtered_data)
-    
-    # Transform and add context
-    transform_function = CATEGORY_MAP[category]['transform']
-    recommendations = [transform_function(entity) for entity in paginated_data]
-    for rec in recommendations:
-        rec['context'] = f"This recommendation seems like a great fit."
-        
-    return recommendations, has_next
+    return recommendations, has_next, search_context
 
 # --- Flask Routes ---
 
@@ -122,15 +37,36 @@ def index():
     """Serves the main application shell."""
     return render_template('index.html')
 
-@app.route('/api/recommendations')
+@app.route('/api/categories')
+def api_categories():
+    """Provides a list of available recommendation categories."""
+    categories = []
+    try:
+        categories_d = api_calls.get_all_categories()
+        categories = categories_d.get('categories_data', [])
+        print(f"Fetched categories: {categories}")
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    return jsonify(categories)
+
+@app.route('/api/create_session', methods=['POST'])
+def create_session():
+    """Generates a unique session ID and stores it."""
+    session_id = str(uuid.uuid4())
+    data = request.json
+    print(f"Creating session with ID: {session_id} and data: {data}")
+    print(f"New session created: {session_id}") 
+    return jsonify({'session_id': session_id})
+
 @app.route('/api/recommendations')
 def api_recommendations():
     """A single, powerful API endpoint to get recommendations."""
-    recommendations, has_next = get_data_from_db(request.args)
+    recommendations, has_next, search_context = get_data_from_db(request.args)
     return jsonify({
         'recommendations': recommendations,
         'has_next': has_next,
-        'next_page': int(request.args.get('page', 1)) + 1
+        'next_page': int(request.args.get('page', 1)) + 1,
+        'search_context': search_context
     })
 
 @app.route('/tag/<tag_id>')
