@@ -73,6 +73,7 @@ def generate_recommendation(session_id, category, query_value, search_type='mess
             'user_message': query_value,
             'is_tags_only': False
         }
+    print(f"Sending request to {url} with body: {body}")
     
     response = requests.post(url, json=body)
     

@@ -1,5 +1,3 @@
-import re
-import json
 from flask import Flask, render_template, request, jsonify
 import api_calls
 import uuid
@@ -14,7 +12,7 @@ def get_data_from_db(search_params):
     category = search_params.get('category', 'Movie')
     page = int(search_params.get('page', 1))
     search_type = search_params.get('search_type', 'message')
-    session_id = "string" #search_params.get('session_id', None)
+    session_id = search_params.get('session_id', None)
     query_value = search_params.get('query')
     tag_name = search_params.get('tag_name', 'Unknown Tag')
 

@@ -6,7 +6,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultsGrid = document.getElementById('recommendations-grid');
     const paginationContainer = document.getElementById('pagination-container');
     const hiddenCategoryInput = document.getElementById('selected-category');
+    const menuToggleBtn = document.getElementById('menu-toggle-btn');
+    const sidebarOverlay = document.querySelector('.sidebar-overlay'); 
     // Sidebar elements
+    const sidebar = document.querySelector('.sidebar');
     const newSessionBtn = document.getElementById('new-session-btn');
     const backBtn = document.getElementById('sidebar-back-btn');
     const sessionList = document.getElementById('session-history-list');
@@ -35,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
             history.unshift(session);
             if (history.length > 20) history.pop();
             saveSessionHistory(history);
+            updateClearButtonState();
 
             // Future extension: Send this history to the backend if needed
             // This is "fire-and-forget". We send the request but don't wait for it.
@@ -94,6 +98,11 @@ document.addEventListener('DOMContentLoaded', () => {
     else {
         container.innerHTML = '';
     }
+    };
+
+    const updateClearButtonState = () => {
+        const history = getSessionHistory();
+        clearHistoryBtn.disabled = history.length === 0;
     };
 
     const handleStateChange = () => {
@@ -242,13 +251,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 messageTextarea.placeholder = placeholderMessages[tagLink.dataset.category] || "Tell me what you're looking for...";
             }
 
+            // Ensure the message textarea is cleared when switching to a tag search
+            messageTextarea.value = '';
+
             // Update tag context display to loading state
             updateSearchContextUI({
                 type: 'tag',
                 name: tagLink.dataset.tagName
             }, 'Loading');
 
-            const params = new URLSearchParams();
+            const params = new URLSearchParams(window.location.search);
             params.set('search_type', 'tag');
             params.set('query', tagLink.dataset.tagId);
             params.set('category', tagLink.dataset.category);
@@ -268,13 +280,38 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
-    window.addEventListener('popstate', handleStateChange);
+    window.addEventListener('popstate', () => {
+        // Check if our application's history has been cleared
+        const sessionHistory = getSessionHistory();
+        if (sessionHistory.length === 0) {
+            // If it's empty, ignore the old URL and force a clean state.
+            resultsGrid.innerHTML = '';
+            paginationContainer.innerHTML = '';
+            updateSearchContextUI(null); // Clear search context
+            form.reset();
+            history.replaceState({}, '', '/'); // Clean the URL
+            return; // Stop here
+        }
+        // If history exists, proceed with the normal state change
+        handleStateChange();   
+    });
 
     clearHistoryBtn.addEventListener('click', () => {
-        // Optional but recommended: Confirm before deleting
         if (confirm('Are you sure you want to clear all session history? This cannot be undone.')) {
+            // 1. Clear the data from localStorage
             localStorage.removeItem('recommendi_sessions');
-            renderSessionHistory(); // Re-render the list, which will now be empty
+            
+            // 2. Clear the session list from the UI
+            renderSessionHistory();
+
+            // 3. Clear the recommendation results from the main view
+            resultsGrid.innerHTML = '';
+            paginationContainer.innerHTML = '';
+            updateSearchContextUI(null); // Clear search context
+            updateClearButtonState();
+
+            // 4. Reset the URL to the base path without reloading the page
+            history.replaceState({}, '', '/');
         }
     });
 
@@ -287,6 +324,16 @@ document.addEventListener('DOMContentLoaded', () => {
         setupCategoryButtons(true);
         history.pushState({}, '', '/');
         renderSessionHistory();
+    });
+
+    menuToggleBtn.addEventListener('click', () => {
+        sidebar.classList.toggle('is-open');
+        sidebarOverlay.classList.toggle('is-active');
+    });
+
+    sidebarOverlay.addEventListener('click', () => {
+        sidebar.classList.remove('is-open');
+        sidebarOverlay.classList.remove('is-active');
     });
     
     // --- SETUP & UI HELPERS ---
@@ -444,6 +491,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const initialize = () => {
         // First, create the category buttons so they are ready.
         setupCategoryButtons(); 
+
+        // Then update the clear button state based on existing history.
+        updateClearButtonState();
 
         // Then, handle the initial state from the URL.
         // This single function will render the session history AND fetch results if needed.
