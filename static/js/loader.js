@@ -387,7 +387,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const showSkeletons = () => { const resultsGrid = document.getElementById('recommendations-grid'); const skeletonTemplate = document.getElementById('skeleton-card-template'); for (let i = 0; i < 4; i++) resultsGrid.append(skeletonTemplate.content.cloneNode(true)); };
+    const showSkeletons = () => { const resultsGrid = document.getElementById('recommendations-grid'); const skeletonTemplate = document.getElementById('skeleton-card-template'); for (let i = 0; i < 2; i++) resultsGrid.append(skeletonTemplate.content.cloneNode(true)); };
     const hideSkeletons = () => { document.querySelectorAll('.skeleton-card').forEach(s => s.remove()); };
     const createCard = (item, category) => { 
         const card = document.createElement('div');

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session
 import api_calls
 import uuid
 
@@ -51,8 +51,11 @@ def api_categories():
 @app.route('/api/create_session', methods=['POST'])
 def create_session():
     """Generates a unique session ID and stores it."""
+    if session.get('session_id'):
+        return jsonify({'session_id': session['session_id']})
     session_id = str(uuid.uuid4())
     data = request.json
+    session['session_id'] = session_id
     print(f"Creating session with ID: {session_id} and data: {data}")
     print(f"New session created: {session_id}") 
     return jsonify({'session_id': session_id})
