@@ -80,8 +80,8 @@ def generate_recommendation(session_id, category, query_value, search_type='mess
     
     if response.status_code == 200:
         resp = response.json()
-        if 'status_code' in resp and resp['status_code'] == 200:
-            return resp
+        print(f"Response from {url}: {response.text[:300]}")
+        return resp
     else:
         response.raise_for_status()  # Raise an error for bad responses
 
@@ -102,6 +102,7 @@ def get_recommendation_data(session_id, category, query_value, search_type='mess
 
     response = requests.get(url)
     if response.status_code == 200:
+        print(f"Response from {url}: {response.text[:300]}")
         return response.json()
     else:
         response.raise_for_status()  # Raise an error for bad responses

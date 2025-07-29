@@ -193,6 +193,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
+
+        // Ensure the form is not submitted while loading
+        if (isLoading) return;
+
+        // Clear previous message history for the current category
+        for (const key in messageHistory) {
+            delete messageHistory[key];
+        }
+
         const formData = new FormData(form);
         const message = formData.get('user_message');
         if (!message.trim() || isLoading) return;
@@ -464,7 +473,11 @@ document.addEventListener('DOMContentLoaded', () => {
             actionBtnHTML = `<button class="${btnClass}" ${btnDisabled}>${btnText}</button>`;
         }
         
-        const footerHTML = `<div class="modal-footer"><div class="footer-meta">${footerMeta}</div><div class="footer-actions"><button class="btn-reaction">👍</button><button class="btn-reaction">👎</button>${actionBtnHTML}</div></div>`;
+        const footerRowHTML = `<div class="modal-footer"><div class="footer-meta">${footerMeta}</div><div class="footer-actions"><button class="btn-reaction">👍</button><button class="btn-reaction">👎</button>${actionBtnHTML}</div></div>`;
+
+        const tipHTML = `<div class="footer-tip"><i class="fas fa-lightbulb"></i><span>Tip: Click any tag to explore recommendations for that tag.</span></div>`;
+
+        const fullFooterHTML = footerRowHTML + tipHTML;
         modalBody.innerHTML = `
             <img src="${item.image.url || 'https://via.placeholder.com/600x338.png?text=No+Image'}" alt="Cover for ${item.title}" class="modal-img-top">
             <div class="modal-text-content">
@@ -476,7 +489,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h3>Tags</h3>
                 ${tagsHTML}
                 ${extraDataHTML}
-                ${footerHTML}
+                ${fullFooterHTML}
             </div>
         `;
         modalOverlay.classList.add('active');

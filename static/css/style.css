@@ -233,6 +233,22 @@ textarea:focus { outline: none; border-color: var(--primary-green); box-shadow: 
 }
 .submit-btn { display: block; width: 100%; padding: 0.85rem; font-size: 1.1rem; font-weight: 600; color: var(--white); background-color: var(--primary-green); border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.2s; margin-top: 1rem; }
 .submit-btn:hover { background-color: var(--dark-green-hover); }
+.discovery-notice {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1.25rem;
+    margin-bottom: 2rem;
+    font-size: 0.9rem;
+    color: #386641; /* A darker green for text */
+    background-color: #e9f7ec; /* A very light green */
+    border-left: 5px solid var(--primary-green);
+    border-radius: 8px;
+}
+
+.discovery-notice .fa-star {
+    color: var(--primary-green);
+}
 .results-container h2 { font-size: 1.8rem; margin-bottom: 1.5rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--gray); }
 .no-results { text-align: center; font-size: 1.1rem; color: #6c757d; padding: 2rem; background: #fff; border-radius: var(--border-radius); }
 .recommendations-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
@@ -295,6 +311,16 @@ textarea:focus { outline: none; border-color: var(--primary-green); box-shadow: 
 .footer-actions { display: flex; gap: 0.75rem; }
 .footer-actions button { padding: 0.5rem 1rem; border: 1px solid var(--gray); background-color: #fff; border-radius: 20px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
 .footer-actions button:hover { border-color: #343a40; background-color: var(--light-gray); }
+.footer-tip {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 0.5rem 0; /* Add some space above */
+    margin-top: 1rem;
+    font-size: 0.85rem;
+    color: #6c757d; /* Muted text color */
+    border-top: 1px solid var(--gray);
+}
 .btn-reaction { font-size: 1rem; }
 .modal-action-btn { border-color: var(--primary-green); color: var(--primary-green); }
 .modal-action-btn:hover { background-color: var(--primary-green); color: #fff; }
