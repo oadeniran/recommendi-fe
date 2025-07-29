@@ -1,8 +1,10 @@
 from flask import Flask, render_template, request, jsonify, session
 import api_calls
 import uuid
+from config import SECRET_KEY
 
 app = Flask(__name__)
+app.secret_key = SECRET_KEY
 
 
 def get_data_from_db(search_params):
@@ -76,6 +78,13 @@ def update_session():
 
     return jsonify({'status': 'success', 'session_id': session_id})
 
+@app.route('/api/reset_session', methods=['POST'])
+def reset_session():
+    """Resets the current session by clearing the session data."""
+    session.clear()
+    print("Session cleared.")
+    return jsonify({'status': 'success', 'message': 'Session cleared successfully'})
+
 
 @app.route('/api/recommendations')
 def api_recommendations():
@@ -87,12 +96,6 @@ def api_recommendations():
         'next_page': int(request.args.get('page', 1)) + 1,
         'search_context': search_context
     })
-
-@app.route('/tag/<tag_id>')
-def search_by_tag(tag_id):
-    """Placeholder route for tag searches.
-    In a real app, this would also fetch data and return a page or JSON."""
-    return f"<h1>Searching for items with Tag ID: {tag_id}</h1><p>This page would show all recommendations associated with this tag.</p>"
 
 if __name__ == '__main__':
     app.run(debug=True)

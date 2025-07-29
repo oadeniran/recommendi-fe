@@ -318,6 +318,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 4. Reset the URL to the base path without reloading the page
             history.replaceState({}, '', '/');
+
+            //5 . Non blocking call to reset the session on the backend
+            fetch('/api/reset_session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'clear_history' })
+            }).catch(error => {
+                console.error('Failed to reset session on backend:', error);
+            });
         }
     });
 
