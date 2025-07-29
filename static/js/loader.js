@@ -493,6 +493,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
         modalOverlay.classList.add('active');
+        document.body.classList.add('modal-open'); // Prevent body scroll when modal is open
 
         const toggleBtn = document.getElementById('toggle-extra-btn');
         if (toggleBtn) {
@@ -513,6 +514,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const closeModal = () => {
         modalOverlay.classList.remove('active');
+        document.body.classList.remove('modal-open'); // Re-enable body scroll
     };
 
     closeModalBtn.addEventListener('click', closeModal);

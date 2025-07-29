@@ -18,6 +18,9 @@ body {
     color: var(--text-color);
     line-height: 1.6;
 }
+body.modal-open {
+    overflow: hidden;
+}
 .app-wrapper {
     display: flex;
 }
