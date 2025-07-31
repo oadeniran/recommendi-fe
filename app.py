@@ -19,16 +19,18 @@ def get_data_from_db(search_params):
     tag_name = search_params.get('tag_name', 'Unknown Tag')
 
     search_context = {'type': search_type, 'query': query_value, 'name': tag_name}
+    error = None
     
     try:
-        recommendations_obj = api_calls.get_recommendation_data(session_id, category, query_value=query_value, search_type=search_type, page=page).get("recommendations", {})
-        recommendations = recommendations_obj.get('recommendations', [])
-        has_next = recommendations_obj.get('has_next_page', False)
+        recommendations_obj = api_calls.get_recommendation_data(session_id, category, query_value=query_value, search_type=search_type, page=page)
+        recommendations = recommendations_obj.get("recommendations", {}).get('recommendations', [])
+        has_next = recommendations_obj.get("recommendations", {}).get('has_next_page', False)
+        error = recommendations_obj.get('error', None)
     except Exception as e:
         print(f"Error generating recommendations for query{query_value} in category {category}: {e}")
-        return [], False
+        return [], False, search_context, error
     
-    return recommendations, has_next, search_context
+    return recommendations, has_next, search_context, error
 
 # --- Flask Routes ---
 
@@ -89,12 +91,14 @@ def reset_session():
 @app.route('/api/recommendations')
 def api_recommendations():
     """A single, powerful API endpoint to get recommendations."""
-    recommendations, has_next, search_context = get_data_from_db(request.args)
+    recommendations, has_next, search_context, error = get_data_from_db(request.args)
+    print(error)
     return jsonify({
         'recommendations': recommendations,
         'has_next': has_next,
         'next_page': int(request.args.get('page', 1)) + 1,
-        'search_context': search_context
+        'search_context': search_context,
+        'error_message': error
     })
 
 if __name__ == '__main__':

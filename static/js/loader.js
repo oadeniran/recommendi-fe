@@ -69,6 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             a.addEventListener('click', (e) => {
                 e.preventDefault();
+                if (isLoading) return; // Prevent action if already loading
                 window.history.pushState({}, '', session.url);
                 // fetchAndRender();
                 // renderSessionHistory(); 
@@ -106,6 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const handleStateChange = () => {
+        if (isLoading) return;
         const params = new URLSearchParams(window.location.search);
         
         // Update the form to match the URL state
@@ -149,6 +151,12 @@ document.addEventListener('DOMContentLoaded', () => {
             history.replaceState({}, '', `?${params.toString()}`);
         }
 
+        // Ensure the category in params is what the buttons are set to
+        const currentCategory = hiddenCategoryInput.value;
+        if (params.get('category') !== currentCategory) {
+            hiddenCategoryInput.value = params.get('category') || 'Movie';
+        }
+
         if (!append) {
             resultsGrid.innerHTML = '';
             paginationContainer.innerHTML = '';
@@ -174,7 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.recommendations.length === 0 && !append) {
                 const message = data.error_message || "We couldn't find any recommendations. Please try a different search.";
                 resultsGrid.innerHTML = `<p class="error-message">${message}</p>`;
-                return;
+                return false;
             }
             
             data.recommendations.forEach(item => {
@@ -182,10 +190,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 resultsGrid.append(createCard(item, category));
             });
             updatePagination(data.has_next);
+            return true; // Indicate that data was successfully fetched and rendered
         } catch (error) {
             console.error('Fetch error:', error);
             hideSkeletons();
             resultsGrid.innerHTML = `<p class="error-message">Oops! Something went wrong.</p>`;
+            return false; // Indicate that an error occurred
         } finally {
             isLoading = false;
         }
@@ -230,8 +240,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const newUrl = `?${params.toString()}`;
             history.pushState({}, '', newUrl);
 
-            // 3. Add to localStorage history (including the session ID)
-            addToHistory({
+            // 3. Fetch and render the recommendations
+            const success = await fetchAndRender();
+            if (!success) return; // If fetch failed, stop here
+
+            // 4. Only on success Add to localStorage history (including the session ID)
+            if (success) {
+                addToHistory({
                 id: Date.now(),
                 session_id: sessionId, // Store the ID
                 full_message: message,
@@ -240,10 +255,10 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             
             renderSessionHistory();
-            fetchAndRender();
+            }  
 
         } catch (error) {
-            console.error("Error creating session:", error);
+            console.error("Error In submission:", error);
         }
     });
 
@@ -253,6 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (tagLink) {
             e.preventDefault();
+            if (isLoading) return; // Prevent action if already loading
             closeModal();
 
             //ensure button is set to the current category
@@ -312,6 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     clearHistoryBtn.addEventListener('click', () => {
+        if (isLoading) return; // Prevent action if already loading
         if (confirm('Are you sure you want to clear all session history? This cannot be undone.')) {
             // 1. Clear the data from localStorage
             localStorage.removeItem('recommendi_sessions');
@@ -341,6 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     backBtn.addEventListener('click', () => history.back());
     newSessionBtn.addEventListener('click', () => {
+        if (isLoading) return; // Prevent action if already loading
         resultsGrid.innerHTML = '';
         paginationContainer.innerHTML = '';
         form.reset();
@@ -378,13 +396,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     button.className = 'category-btn';
                     button.dataset.value = cat.value;
                     button.textContent = cat.name;
-                    if (index === 0) {
-                        button.classList.add('active');
-                        hiddenCategoryInput.value = cat.value;
-                        messageLabel.textContent = cat.label;
-                        messageTextarea.placeholder = cat.placeholder;
-                    }
+                    // if (index === 0) {
+                    //     button.classList.add('active');
+                    //     hiddenCategoryInput.value = cat.value;
+                    //     messageLabel.textContent = cat.label;
+                    //     messageTextarea.placeholder = cat.placeholder;
+                    // }
                     button.addEventListener('click', function() {
+                        if (isLoading) return; // Prevent action if already loading
                         const newCategoryValue = this.dataset.value;
                         const previousCategoryValue = hiddenCategoryInput.value;
                         if (newCategoryValue === previousCategoryValue) return;
@@ -523,9 +542,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- App Initialization ---
-    const initialize = () => {
+    const initialize = async () => {
         // First, create the category buttons so they are ready.
-        setupCategoryButtons(); 
+        await setupCategoryButtons(); 
 
         // Then update the clear button state based on existing history.
         updateClearButtonState();
