@@ -1,3 +1,5 @@
+Try Recommendi - [Url](https://recommendi-a12f12b1985c.herokuapp.com/)
+
 # Recommendi Frontend
 
 A Flask-based frontend application for the Recommendi recommendation system. This project serves as the user interface layer, handling web routes and user interactions while connecting to an external backend API for recommendation data.
