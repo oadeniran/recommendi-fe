@@ -219,10 +219,6 @@ curl "http://localhost:5000/api/recommendations?category=Movies&query=romantic%2
 - All recommendation logic and data processing happens in the external backend
 - Make sure the backend API is running and accessible before starting this frontend
 
-## 📄 License
-
-[Add your license information here]
-
 ## 🤝 Support
 
 For issues related to:
